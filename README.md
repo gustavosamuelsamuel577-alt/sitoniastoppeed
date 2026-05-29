@@ -1026,7 +1026,7 @@ local function notify(title, text, dur) hub:Notify(title, text, dur or 2) end
 local Toggles = {
     Aimbot=false, AimbotMobile=false, AimbotMobileLook=false, AimbotHotkey=false,
     AimbotSmooth=false, CheckTeam=false, CheckWall=false, Spinbot=false,
-    ESP=false, ESPBox=false, ESPLine=false, ESPSkeleton=false, ESPChams=false,
+    ESP=false, ESPBox=false, ESPLine=false,
     ESPName=false, ESPStuds=false, ESPRainbow=false,
     Noclip=false, AntiSit=false, AntiAfk=false,
     UseWhitelist=false, HitboxExpanded=false, LegitHitbox=false,
@@ -1389,8 +1389,6 @@ local function RemoveESP(plr)
     if d.Line then pcall(function() d.Line:Remove() end) end
     if d.Studs then pcall(function() d.Studs:Remove() end) end
     if d.Name then pcall(function() d.Name:Remove() end) end
-    if d.Chams then pcall(function() d.Chams:Destroy() end) end
-    if d.Skeleton then for _,b in ipairs(d.Skeleton) do pcall(function() b.line:Remove() end) end end
     if d.Tracer then pcall(function() d.Tracer:Remove() end) end
     espObjects[plr]=nil
 end
@@ -1407,25 +1405,6 @@ local function CreateESP(plr)
     if Toggles.ESPLine and hasDrawing then local l=SafeDrawing("Line"); if l then pcall(function() l.Visible=true; l.Color=col; l.Thickness=1; l.Transparency=1 end) end; d.Line=l end
     if Toggles.ESPStuds and hasDrawing then local t=SafeDrawing("Text"); if t then pcall(function() t.Visible=true; t.Color=col; t.Size=12; t.Font=Drawing.Fonts.UI; t.Outline=true; t.Center=true; t.Transparency=1 end) end; d.Studs=t end
     if Toggles.ESPName and hasDrawing then local t=SafeDrawing("Text"); if t then pcall(function() t.Visible=true; t.Color=col; t.Size=12; t.Font=Drawing.Fonts.UI; t.Outline=true; t.Center=true; t.Transparency=1 end) end; d.Name=t end
-    if Toggles.ESPChams then
-        local ok,h=pcall(function()
-            local x=Instance.new("Highlight"); x.FillColor=col; x.FillTransparency=0.7; x.OutlineColor=col; x.OutlineTransparency=0.1; x.Parent=ch; return x
-        end); if ok then d.Chams=h end
-    end
-    if Toggles.ESPSkeleton and hasDrawing then
-        local ls={}; local bones={
-            {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
-            {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
-            {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
-            {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
-            {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
-        }
-        for _,b in ipairs(bones) do
-            local l=SafeDrawing("Line"); if l then pcall(function() l.Visible=true; l.Color=col; l.Thickness=1; l.Transparency=1 end) end
-            table.insert(ls,{line=l, from=b[1], to=b[2]})
-        end
-        d.Skeleton=ls
-    end
     if Toggles.ESPTracer and hasDrawing then
         local l=SafeDrawing("Line"); if l then pcall(function() l.Visible=true; l.Color=col; l.Thickness=1; l.Transparency=1 end) end
         d.Tracer=l
@@ -1985,8 +1964,6 @@ do
     c:AddToggle("ESP Master", false, function(s) Toggles.ESP=s; UpdateAllESP() end)
     c:AddToggle("ESP Box", false, function(s) Toggles.ESPBox=s; UpdateAllESP() end)
     c:AddToggle("ESP Line", false, function(s) Toggles.ESPLine=s; UpdateAllESP() end)
-    c:AddToggle("ESP Skeleton", false, function(s) Toggles.ESPSkeleton=s; UpdateAllESP() end)
-    c:AddToggle("ESP Chams", false, function(s) Toggles.ESPChams=s; UpdateAllESP() end)
     c:AddToggle("ESP Name", false, function(s) Toggles.ESPName=s; UpdateAllESP() end)
     c:AddToggle("ESP Studs (dist)", false, function(s) Toggles.ESPStuds=s; UpdateAllESP() end)
     c:AddToggle("ESP Rainbow", false, function(s) Toggles.ESPRainbow=s; ESPRainbowActive=s end)
@@ -2140,4 +2117,41 @@ do
         if data.HitboxTransparency then hitboxTransparency = data.HitboxTransparency end
         if data.LegitTam then legitTam = data.LegitTam end
         if type(data.ESPColor)=="table" then ESPColor = Color3.new(data.ESPColor[1],data.ESPColor[2],data.ESPColor[3]) end
-        if type(data.FOVColor)=="table"
+        if type(data.FOVColor)=="table" then FOVColor = Color3.new(data.FOVColor[1],data.FOVColor[2],data.FOVColor[3]) end
+        if type(data.Whitelist)=="table" then
+            Whitelist = {}
+            for _,n in ipairs(data.Whitelist) do Whitelist[n] = true end
+        end
+        if data.NotificationsEnabled ~= nil then hub.NotificationsEnabled = data.NotificationsEnabled end
+        if data.carSensitivity then carSensitivity = data.carSensitivity end
+        if data.nitroForce then nitroForce = data.nitroForce end
+        if data.TELEPORT_DELAY_SECONDS then TELEPORT_DELAY_SECONDS = data.TELEPORT_DELAY_SECONDS end
+        pcall(UpdateAllESP)
+    end
+
+    local sc = cfg:AddCard("Salvar / Carregar Config")
+    CardAddLabel(sc, "Salva em um único arquivo (substitui o anterior).")
+    sc:AddButton("Salvar Config", function()
+        if not hasFS() then notify("Config", "Executor sem suporte a arquivos"); return end
+        local ok, json = pcall(function() return HttpService:JSONEncode(snapshotConfig()) end)
+        if not ok then notify("Config", "Erro ao codificar"); return end
+        local okw = pcall(function() writefile(CONFIG_FILE, json) end)
+        if okw then notify("Config", "Salvo em " .. CONFIG_FILE) else notify("Config", "Falha ao salvar") end
+    end)
+    sc:AddButton("Recarregar Config", function()
+        if not hasFS() then notify("Config", "Executor sem suporte a arquivos"); return end
+        if not isfile(CONFIG_FILE) then notify("Config", "Nenhuma config salva"); return end
+        local ok, raw = pcall(function() return readfile(CONFIG_FILE) end)
+        if not ok or not raw then notify("Config", "Falha ao ler"); return end
+        local okd, data = pcall(function() return HttpService:JSONDecode(raw) end)
+        if not okd then notify("Config", "Arquivo inválido"); return end
+        applyConfig(data)
+        notify("Config", "Config carregada")
+    end)
+    sc:AddButton("Apagar Config Salva", function()
+        if not hasFS() then notify("Config", "Executor sem suporte"); return end
+        if type(delfile)=="function" and isfile(CONFIG_FILE) then
+            pcall(function() delfile(CONFIG_FILE) end)
+            notify("Config", "Arquivo apagado")
+        else
+            
